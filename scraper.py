@@ -1,102 +1,89 @@
-# import requests
-# from bs4 import BeautifulSoup
-# import re
-# import time
+# scraper.py
+from industry_classifier import determine_industry
 
-# def estimate_revenue_from_headcount(employees, industry):
-#     """
-#     Estimate revenue based on employee count and industry averages
-#     Sources: https://www.quora.com/What-is-the-average-revenue-per-employee-by-industry
-#     """
-#     industry_multipliers = {
-#         'software': 250000,
-#         'tech': 200000,
-#         'manufacturing': 150000,
-#         'financial': 300000,
-#         'default': 180000
-#     }
-    
-#     multiplier = industry_multipliers.get(industry.lower(), industry_multipliers['default'])
-#     return int(employees * multiplier)
- 
-# def scrape_linkedin_headcount(company_name):
-#     """Mock LinkedIn scraper - in production use LinkedIn API or scraping service"""
-#     try:
-#         # This is a mock implementation - replace with real scraping code
-#         time.sleep(1)  # Rate limiting
-        
-#         # Mock data - different headcounts based on company name keywords
-#         if 'data' in company_name.lower():
-#             return 150  # Data companies tend to be midsize
-#         elif 'tech' in company_name.lower():
-#             return 300
-#         elif 'software' in company_name.lower():
-#             return 200
-#         else:
-#             return 100  # Default for other industries
-#     except:
-#         return None
-
-# def enrich_company_data(company):
-#     try:
-#         # Get headcount estimate
-#         employees = scrape_linkedin_headcount(company['name'])
-#         company['employees'] = employees or 100  # Default to 100 if scraping fails
-        
-#         # Estimate revenue if missing
-#         if not company.get('revenue') or company['revenue'] == 0:
-#             industry = 'software' if 'software' in company['description'].lower() else 'tech'
-#             company['revenue'] = estimate_revenue_from_headcount(company['employees'], industry)
-#             company['revenue_estimated'] = True
-        
-#         # Add AI/Tech scores
-#         desc = company.get("description", "").lower()
-#         company['ai_score'] = 3 if "ai" in desc or "artificial intelligence" in desc else 0
-#         company['tech_score'] = 2 if "platform" in desc or "tech" in desc else 1
-        
-#         return company
-#     except Exception as e:
-#         print(f"Error enriching {company.get('name')}: {e}")
-#         return company
-
-
-
-def estimate_revenue_from_headcount(employees, industry):
-    """Fast revenue estimation without API calls"""
-    # Industry multipliers ($ revenue per employee)
-    multipliers = {
-        'software': 250000,
-        'tech': 200000,
-        'financial': 300000,
-        'default': 180000
+def estimate_revenue_from_industry(employees, industry):
+    """Estimate revenue based on industry benchmarks per employee"""
+    benchmarks = {
+        'fintech': 250000,    # $250K per employee
+        'software': 200000,
+        'data': 180000,
+        'security': 220000,
+        'infrastructure': 150000,
+        'hr_tech': 175000,
+        'hardware': 120000,
+        'real_estate': 100000,
+        'other': 150000
     }
-    return employees * multipliers.get(industry.lower(), multipliers['default'])
+    return int(employees * benchmarks.get(industry, 150000))
+
+def estimate_ebitda_margin(industry):
+    """Estimate typical EBITDA margin by industry"""
+    margins = {
+        'fintech': 0.25,    # 25%
+        'software': 0.30,
+        'data': 0.20,
+        'security': 0.25,
+        'infrastructure': 0.15,
+        'hr_tech': 0.20,
+        'hardware': 0.10,
+        'real_estate': 0.15,
+        'other': 0.10
+    }
+    return margins.get(industry, 0.10)
 
 def enrich_company_data(company):
-    """Fast enrichment without real scraping"""
     try:
-        # Estimate employees based on simple rules (no API calls)
-        name = company['name'].lower()
-        desc = company.get('description', '').lower()
+        # Skip if already enriched
+        if company.get('_enriched'):
+            return company
+            
+        # Determine industry
+        industry = determine_industry(company.get('description', ''))
+        company['industry'] = industry
         
-        if 'data' in name or 'data' in desc:
-            employees = 150
-            industry = 'tech'
-        elif 'tech' in name or 'software' in name:
-            employees = 200
-            industry = 'software'
-        else:
-            employees = 100
-            industry = 'default'
-        
-        company['employees'] = employees
+        # Estimate employees if missing
+        if not company.get('employees'):
+            # Base estimation on description length and keywords
+            desc = company.get('description', '').lower()
+            base = 50
+            if 'enterprise' in desc:
+                base += 150
+            if 'startup' in desc:
+                base = max(10, base - 30)
+            company['employees'] = base + (len(desc) // 100)
+            company['employees_estimated'] = True
         
         # Estimate revenue if missing
-        if not company.get('revenue') or company['revenue'] == 0:
-            company['revenue'] = estimate_revenue_from_headcount(employees, industry)
+        if not company.get('revenue'):
+            company['revenue'] = estimate_revenue_from_industry(
+                company['employees'],
+                industry
+            )
             company['revenue_estimated'] = True
         
+        # Estimate EBITDA if missing
+        if not company.get('ebitda') and company.get('revenue'):
+            margin = estimate_ebitda_margin(industry)
+            company['ebitda'] = int(company['revenue'] * margin)
+            company['ebitda_estimated'] = True
+        
+        # Estimate growth if missing
+        if not company.get('growth_rate'):
+            company['growth_rate'] = {
+                'fintech': 25,
+                'software': 30,
+                'data': 20,
+                'security': 25,
+                'infrastructure': 15,
+                'hr_tech': 20,
+                'hardware': 15,
+                'real_estate': 10,
+                'other': 10
+            }.get(industry, 10)
+            company['growth_estimated'] = True
+        
+        company['_enriched'] = True
         return company
     except Exception as e:
-        print(f"Skipping enrichment for {company.get('name')}: {str(e)}")
+        print(f"Error enriching {company.get('name', 'Unknown')}: {str(e)}")
         return company

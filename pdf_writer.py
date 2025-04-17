@@ -1,3 +1,4 @@
+# pdf_writer.py
 from fpdf import FPDF
 import re
 
@@ -5,9 +6,10 @@ def clean_text(text):
     if not text:
         return ""
     text = str(text)
-    # Keep only printable ASCII and preserve line breaks
     text = re.sub(r'[^\x20-\x7E\r\n]', '', text)
     return text
+
+
 
 class PDF(FPDF):
     def __init__(self):
@@ -24,31 +26,37 @@ class PDF(FPDF):
         if max_len:
             text = text[:max_len] + '...' if len(text) > max_len else text
         
-        # Split into paragraphs and handle each separately
         for paragraph in text.split('\n'):
             self.multi_cell(0, 6, paragraph)
             self.ln(2)
     
     def header(self):
-        self.safe_text("Top Ranked Companies", 'B', 14)
+        self.safe_text("Top Companies for Strattam Capital", 'B', 14)
+        self.safe_text("Investment Criteria: $10-30M revenue, >10% growth, positive EBITDA", 'I', 10)
         self.ln(5)
 
     def company_block(self, company):
         # Name and basic info
         self.safe_text(company.get('name', 'Unknown'), 'B', 12)
-        self.safe_text(f"Score: {company.get('score', 0)}")
+        self.safe_text(f"Score: {company.get('score', 0)} | Industry: {company.get('industry', 'N/A')}")
         
-        # Revenue with estimation note if applicable
+        # Financial metrics
         revenue_text = f"Revenue: ${company.get('revenue', 0):,}"
         if company.get('revenue_estimated'):
-            revenue_text += " (estimated from headcount)"
+            revenue_text += " (estimated)"
         self.safe_text(revenue_text)
         
+        ebitda_text = f"EBITDA: ${company.get('ebitda', 0):,}"
+        if company.get('ebitda_estimated'):
+            ebitda_text += " (estimated)"
+        self.safe_text(ebitda_text)
+        
+        self.safe_text(f"Growth Rate: {company.get('growth_rate', 'N/A')}%")
         self.safe_text(f"Employees: {company.get('employees', 'N/A')}")
         
-        # Full description with proper wrapping
+        # Description
         self.safe_text("Description:", 'I')
-        self.safe_text(company.get('description', 'No description available'), max_len=2000)
+        self.safe_text(company.get('description', 'No description available'), max_len=1000)
         self.ln(10)
 
 def generate_pdf(companies, filename="top_companies.pdf"):
