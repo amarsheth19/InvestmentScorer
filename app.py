@@ -41,12 +41,28 @@ def upload():
                     error = "Upload took too long"
                 else:
                     # Process the PDF
+                    print("=== Extracting text from PDF ===")
                     text = extract_text_from_pdf(filename)
-                    companies = parse_companies(text)[:50]  # Limit to first 50 companies
                     
-                    # Enrich company data
+                    print("=== Parsing companies ===")
+                    companies = parse_companies(text)
+                    print(f"Found {len(companies)} companies")
+                    
+                    if companies:
+                        print("First company found:", companies[0]['name'])
+                    
+                    # Get weights from form
+                    weights = {
+                        'revenue_weight': float(request.form.get('revenue_weight', 1)),
+                        'growth_weight': float(request.form.get('growth_weight', 1)),
+                        'profitability_weight': float(request.form.get('profitability_weight', 1)),
+                        'industry_weight': float(request.form.get('industry_weight', 1)),
+                        'size_weight': float(request.form.get('size_weight', 1))
+                    }
+                    
+                    # Enrich company data and get top 10 using weights
                     enriched = [enrich_company_data(c) for c in companies]
-                    top_companies = get_top_10(enriched)
+                    top_companies = get_top_10(enriched, weights)  # Modified to accept weights
                     
                     # Check for timeout again
                     if time.time() - start_time > 10:
@@ -60,9 +76,12 @@ def upload():
                             error = "Failed to generate PDF"
             except Exception as e:
                 error = f"Error processing file: {str(e)}"
+                print(f"Error details: {str(e)}")
+                import traceback
+                traceback.print_exc()
     
-    # If we get here, there was an error
     return render_template("index.html", pdf_ready=False, error=error)
+
 
 @app.route("/download")
 def download():

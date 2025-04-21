@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
     <title>Company Ranking</title>
@@ -37,5 +37,203 @@
     {% if pdf_ready %}
         <a href="/download" class="download-link">Download PDF Report</a>
     {% endif %}
+</body>
+</html> -->
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Company Ranking Tool</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            color: #333;
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        form { 
+            background: #f9f9f9; 
+            padding: 25px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group { 
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        label { 
+            display: block; 
+            margin: 10px 0 5px; 
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .slider-value {
+            min-width: 30px;
+            text-align: center;
+            font-weight: bold;
+        }
+        input[type="range"] { 
+            flex-grow: 1;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #ddd;
+            border-radius: 5px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="submit"] { 
+            background: #27ae60; 
+            color: white; 
+            border: none; 
+            padding: 12px 25px; 
+            margin-top: 20px; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        input[type="submit"]:hover {
+            background: #2ecc71;
+        }
+        .download-link {
+            display: block;
+            text-align: center;
+            margin-top: 25px; 
+            padding: 12px 25px;
+            background: #2980b9; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .download-link:hover {
+            background: #3498db;
+        }
+        .error { 
+            color: #e74c3c; 
+            margin: 15px 0; 
+            padding: 10px;
+            background: #fdecea;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .strategy-section {
+            margin-bottom: 30px;
+        }
+        .strategy-section h3 {
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        .info-text {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Company Ranking Tool</h1>
+    
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+    
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="pdf">Upload Company Profiles PDF:</label>
+            <input type="file" id="pdf" name="pdf" required accept=".pdf">
+        </div>
+
+        <div class="strategy-section">
+            <h3>Investment Strategy Weightings</h3>
+            
+            <div class="form-group">
+                <label for="revenue_weight">Revenue ($10-30M ideal)</label>
+                <div class="slider-container">
+                    <input type="range" id="revenue_weight" name="revenue_weight" min="0" max="5" value="3" step="0.5">
+                    <span class="slider-value" id="revenue_value">3</span>
+                </div>
+                <p class="info-text">Higher values prioritize companies with revenue between $10-30M</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="growth_weight">Growth Rate (>10% ideal)</label>
+                <div class="slider-container">
+                    <input type="range" id="growth_weight" name="growth_weight" min="0" max="5" value="3" step="0.5">
+                    <span class="slider-value" id="growth_value">3</span>
+                </div>
+                <p class="info-text">Higher values prioritize high-growth companies (>10% growth)</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="profitability_weight">Profitability (Positive EBITDA)</label>
+                <div class="slider-container">
+                    <input type="range" id="profitability_weight" name="profitability_weight" min="0" max="5" value="3" step="0.5">
+                    <span class="slider-value" id="profitability_value">3</span>
+                </div>
+                <p class="info-text">Higher values prioritize profitable companies with positive EBITDA</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="industry_weight">Industry Focus</label>
+                <div class="slider-container">
+                    <input type="range" id="industry_weight" name="industry_weight" min="0" max="5" value="2" step="0.5">
+                    <span class="slider-value" id="industry_value">2</span>
+                </div>
+                <p class="info-text">Higher values prioritize Software, FinTech, Data, and Security companies</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="size_weight">Company Size (Employees)</label>
+                <div class="slider-container">
+                    <input type="range" id="size_weight" name="size_weight" min="0" max="5" value="1" step="0.5">
+                    <span class="slider-value" id="size_value">1</span>
+                </div>
+                <p class="info-text">Higher values prioritize mid-size companies (50-200 employees)</p>
+            </div>
+        </div>
+
+        <input type="submit" value="Generate Custom Report">
+    </form>
+
+    {% if pdf_ready %}
+        <a href="/download" class="download-link">Download PDF Report</a>
+    {% endif %}
+
+    <script>
+        // Update slider value displays in real-time
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            const valueDisplay = document.getElementById(`${slider.id}_value`);
+            slider.addEventListener('input', () => {
+                valueDisplay.textContent = slider.value;
+            });
+        });
+    </script>
 </body>
 </html>

@@ -2,94 +2,124 @@ import fitz  # PyMuPDF
 import re
 from industry_classifier import determine_industry
 
+# def extract_text_from_pdf(pdf_path):
+#     """Extract text from PDF while preserving line structure"""
+#     doc = fitz.open(pdf_path)
+#     text = ""
+#     for page in doc:
+#         # Get text with exact line positions
+#         text += page.get_text("text", flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE)
+#         text += "\n===== PAGE END =====\n"  # Add page separator
+#     print(text)
+#     return text
 def extract_text_from_pdf(pdf_path):
-    """Extract text from PDF using precise layout preservation"""
+    """Extract text from PDF while skipping first 2 pages (TOC)"""
     doc = fitz.open(pdf_path)
     text = ""
-    for page in doc:
+    
+    # Start from page 2
+    for page in doc[1:]:
         text += page.get_text("text", flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE)
+        text += "\n===== PAGE END =====\n"  # Add page separator
+    
     return text
 
 def clean_company_name(name):
     """Clean and standardize company names"""
     if not name:
         return "Unknown Company"
-    
-    # Remove common prefixes/suffixes
-    name = re.sub(r'^(Attendee\(s\)|Company\s*Description|Company\s*Profile|Software\s*Sector:)\s*', '', name, flags=re.IGNORECASE)
-    name = re.sub(r'[-–].*$', '', name)  # Remove everything after hyphen/dash
-    name = re.sub(r'\b(inc|llc|ltd|corp|corporation|plc|www\..*?)\b\.?$', '', name, flags=re.IGNORECASE)
-    name = re.sub(r'[^a-zA-Z0-9& ]', '', name)  # Remove special chars
-    return name.strip()
+    name = re.sub(r'www\..+', '', name)  # Remove website
+    name = re.sub(r'\s+', ' ', name).strip()  # Normalize whitespace
+    return name
 
 def parse_companies(text):
-    """Parse company data from PDF text with improved name extraction"""
-    # Split by likely company sections (bold text at start of line)
-    sections = re.split(r'\n(?=\*?[A-Z][a-zA-Z0-9& ]{2,})', text)
+    """Parse company data from PDF text using 5th line rule"""
     companies = []
+    pages = text.split('===== PAGE END =====')
     
-    for sec in sections[1:]:  # Skip first section
-        lines = [line.strip() for line in sec.split('\n') if line.strip()]
-        if not lines or len(lines) < 3:  # Skip very short sections
+    for page in pages:
+        lines = [line.strip() for line in page.split('\n') if line.strip()]
+        if len(lines) < 5:  # Skip pages without enough lines
             continue
             
-        # Extract company name (first line, clean bold markers)
-        name = clean_company_name(lines[0].strip('*').strip())
-        if not name or len(name.split()) > 6:  # Skip unlikely names
+        # 5th line contains company name (0-indexed line 4)
+        name = clean_company_name(lines[4])
+        if not name:
             continue
             
-        # Get description from next non-empty lines
-        description_lines = []
-        for line in lines[1:]:
-            if not re.match(r'^(Revenue|EBITDA|Growth|Employees|Ownership|Financial)', line, re.I):
-                description_lines.append(line)
-            else:
+        # Find the Company Description section
+        description = ""
+        desc_start = None
+        for i, line in enumerate(lines):
+            if "Company Description" in line:
+                desc_start = i + 1
                 break
-        description = " ".join(description_lines[:5])  # First 5 description lines max
-        
+                
+        if desc_start:
+            # Collect description lines until next section
+            desc_lines = []
+            for line in lines[desc_start:]:
+                if re.match(r'^(Company Highlights|Growth Opportunities|Financial Highlights|Ownership Today|Public Company Comps)', line):
+                    break
+                desc_lines.append(line)
+            description = " ".join(desc_lines)
+
         # Extract financial metrics
         revenue = None
         ebitda = None
         growth = None
         employees = None
         
-        for line in lines:
-            # Revenue extraction
-            if "Revenue" in line:
+        # Search the entire page content for financial data
+        page_text = "\n".join(lines)
+        
+        # Revenue extraction
+        rev_match = re.search(r'Revenue[:\s]*[\$£€]?(\d+\.?\d*)\s*([MBmb])', page_text, re.IGNORECASE)
+        if rev_match:
+            try:
+                revenue = float(rev_match.group(1))
+                if 'm' in rev_match.group(2).lower():
+                    revenue *= 1_000_000
+                elif 'b' in rev_match.group(2).lower():
+                    revenue *= 1_000_000_000
+                revenue = int(revenue)
+            except:
+                pass
+                
+        # EBITDA extraction
+        ebitda_match = re.search(r'EBITDA[:\s]*[\$£€]?(\d+\.?\d*)\s*([MBmb])', page_text, re.IGNORECASE)
+        if ebitda_match:
+            try:
+                ebitda = float(ebitda_match.group(1))
+                if 'm' in ebitda_match.group(2).lower():
+                    ebitda *= 1_000_000
+                elif 'b' in ebitda_match.group(2).lower():
+                    ebitda *= 1_000_000_000
+                ebitda = int(ebitda)
+            except:
+                pass
+                
+        # Growth rate extraction
+        growth_match = re.search(r'(?:Growth|Growth Rate)[:\s]*(\d+)%', page_text, re.IGNORECASE)
+        if growth_match:
+            try:
+                growth = int(growth_match.group(1))
+            except:
+                pass
+                
+        emp_match = re.search(r'(?:Employees|Headcount)[:\s]*~?(\d+)', page_text, re.IGNORECASE)
+        if emp_match:
+            try:
+                employees = int(emp_match.group(1))
+            except:
+                pass
+
+        # If not found in dedicated field, try extracting from description
+        if employees is None and description:
+            employees_match = re.search(r'(?:with|has|employs)\s*(?:~)?(\d+)\s*employees', description, re.IGNORECASE)
+            if employees_match:
                 try:
-                    num = re.search(r'[\$£€]?(\d+\.?\d*)\s*[MB]', line.replace(',', ''))
-                    if num:
-                        revenue = float(num.group(1))
-                        if 'M' in line.upper():
-                            revenue *= 1_000_000
-                        elif 'B' in line.upper():
-                            revenue *= 1_000_000_000
-                        revenue = int(revenue)
-                except:
-                    pass
-            # EBITDA extraction
-            elif "EBITDA" in line:
-                try:
-                    num = re.search(r'[\$£€]?(\d+\.?\d*)\s*[MB]', line.replace(',', ''))
-                    if num:
-                        ebitda = float(num.group(1))
-                        if 'M' in line.upper():
-                            ebitda *= 1_000_000
-                        elif 'B' in line.upper():
-                            ebitda *= 1_000_000_000
-                        ebitda = int(ebitda)
-                except:
-                    pass
-            # Growth rate extraction
-            elif "Growth" in line or "growth" in line:
-                try:
-                    growth = int(re.search(r'(\d+)%', line).group(1))
-                except:
-                    pass
-            # Employees extraction
-            elif "employees" in line.lower() or "headcount" in line.lower():
-                try:
-                    employees = int(re.search(r'~?(\d+)', line).group(1))
+                    employees = int(employees_match.group(1))
                 except:
                     pass
 
@@ -104,57 +134,177 @@ def parse_companies(text):
     
     return companies
 
-def score_company(company):
-    """Score companies based on Strattam Capital's investment criteria"""
+# def score_company(company, weights):
+#     """Score companies based on customizable weightings"""
+#     score = 0
+    
+#     # Get weights with defaults if not provided
+#     revenue_weight = weights.get('revenue_weight', 1)
+#     growth_weight = weights.get('growth_weight', 1)
+#     profitability_weight = weights.get('profitability_weight', 1)
+#     industry_weight = weights.get('industry_weight', 1)
+#     size_weight = weights.get('size_weight', 1)
+    
+#     # Revenue scoring (10-30M ideal)
+#     revenue = company.get('revenue')
+#     if revenue:
+#         if 10_000_000 <= revenue <= 30_000_000:
+#             score += 40 * revenue_weight
+#         elif 5_000_000 <= revenue < 10_000_000:
+#             score += 30 * revenue_weight
+#         elif 30_000_000 < revenue <= 50_000_000:
+#             score += 25 * revenue_weight
+#         elif revenue > 50_000_000:
+#             score += 10 * revenue_weight
+#         else:
+#             score += 5 * revenue_weight
+    
+#     # Growth scoring (>10% ideal)
+#     growth = company.get('growth_rate')
+#     if growth:
+#         if growth >= 30:
+#             score += 30 * growth_weight
+#         elif growth >= 20:
+#             score += 25 * growth_weight
+#         elif growth >= 10:
+#             score += 15 * growth_weight
+#         elif growth >= 5:
+#             score += 5 * growth_weight
+    
+#     # Profitability scoring
+#     ebitda = company.get('ebitda')
+#     revenue = company.get('revenue', 1)
+#     if ebitda:
+#         if ebitda > revenue * 0.2:  # >20% margin
+#             score += 20 * profitability_weight
+#         elif ebitda > 0:
+#             score += 10 * profitability_weight
+    
+#     # Industry fit scoring
+#     industry = determine_industry(company.get('description', ''))
+#     if industry in ['software', 'fintech', 'data', 'security']:
+#         score += 10 * industry_weight
+#     elif industry in ['infrastructure', 'hr_tech']:
+#         score += 5 * industry_weight
+    
+#     # Company size scoring
+#     employees = company.get('employees')
+#     if employees:
+#         if 50 <= employees <= 200:
+#             score += 10 * size_weight
+#         elif employees < 50:
+#             score += 5 * size_weight
+#         else:
+#             score += 2 * size_weight
+    
+#     # Normalize to 100 point scale
+#     max_possible = (40 + 30 + 20 + 10 + 10)  # Max points from all categories
+#     #return min(int((score / max_possible) * 100), 100)
+#     return score
+
+def score_company(company, weights):
+    """Score companies based on customizable weightings"""
     score = 0
     
-    # Revenue scoring (10-30M ideal) - 40 points max
-    if company.get('revenue'):
-        if 10_000_000 <= company['revenue'] <= 30_000_000:
-            score += 40  # Perfect match
-        elif 5_000_000 <= company['revenue'] < 10_000_000:
-            score += 30  # Below ideal but acceptable
-        elif 30_000_000 < company['revenue'] <= 50_000_000:
-            score += 35  # Slightly above ideal
-        elif company['revenue'] > 50_000_000:
-            score += 20  # Too large
-        else:
-            score += 10  # Too small
+    # Get weights with defaults if not provided
+    revenue_weight = weights.get('revenue_weight', 1)
+    growth_weight = weights.get('growth_weight', 1)
+    profitability_weight = weights.get('profitability_weight', 1)
+    industry_weight = weights.get('industry_weight', 1)
+    size_weight = weights.get('size_weight', 1)
     
-    # Growth scoring (>10% ideal) - 30 points max
-    if company.get('growth_rate'):
-        if company['growth_rate'] >= 30:
-            score += 30  # Exceptional growth
-        elif company['growth_rate'] >= 20:
-            score += 25  # Strong growth
-        elif company['growth_rate'] >= 10:
-            score += 20  # Meets minimum
-        elif company['growth_rate'] >= 5:
-            score += 10  # Below target
+    # Revenue scoring (10-30M ideal) - max 40 points
+    revenue = company.get('revenue')
+    if revenue:
+        if 10_000_000 <= revenue <= 30_000_000:
+            score += 40 * revenue_weight
+        elif 5_000_000 <= revenue < 10_000_000:
+            score += 30 * revenue_weight
+        elif 30_000_000 < revenue <= 50_000_000:
+            score += 25 * revenue_weight
+        elif revenue > 50_000_000:
+            score += 10 * revenue_weight
         else:
-            score += 5   # Low growth
+            score += 5 * revenue_weight
     
-    # Profitability scoring - 20 points max
-    if company.get('ebitda'):
-        if company['ebitda'] > company.get('revenue', 1) * 0.2:  # >20% margin
-            score += 20
-        elif company['ebitda'] > 0:
-            score += 15  # Positive but low margin
+    # Growth scoring (>10% ideal) - max 30 points
+    growth = company.get('growth_rate')
+    if growth:
+        if growth >= 30:
+            score += 30 * growth_weight
+        elif growth >= 20:
+            score += 25 * growth_weight
+        elif growth >= 10:
+            score += 20 * growth_weight
+        elif growth >= 5:
+            score += 10 * growth_weight
         else:
-            score += 5   # Negative EBITDA
+            score += 5 * growth_weight
     
-    # Industry fit scoring - 10 points max
+    # Profitability scoring - max 20 points
+    ebitda = company.get('ebitda')
+    revenue = company.get('revenue', 1)
+    if ebitda:
+        if ebitda > revenue * 0.2:  # >20% margin
+            score += 20 * profitability_weight
+        elif ebitda > 0:
+            score += 15 * profitability_weight
+        else:
+            score += 5 * profitability_weight
+    
+    # Industry fit scoring - max 10 points
     industry = determine_industry(company.get('description', ''))
     if industry in ['software', 'fintech', 'data', 'security']:
-        score += 10  # Perfect match
+        score += 10 * industry_weight
     elif industry in ['infrastructure', 'hr_tech']:
-        score += 5   # Partial match
+        score += 5 * industry_weight
     
-    return score
+    # Company size scoring - max 10 points
+    employees = company.get('employees')
+    if employees:
+        if 50 <= employees <= 200:
+            score += 10 * size_weight
+        elif employees < 50:
+            score += 5 * size_weight
+        else:
+            score += 2 * size_weight
+    
+    # Normalize the score to a 100-point scale based on weights
+    max_possible = (
+        40 * revenue_weight + 
+        30 * growth_weight + 
+        20 * profitability_weight + 
+        10 * industry_weight + 
+        10 * size_weight
+    )
+    
+    if max_possible > 0:
+        normalized_score = (score / max_possible) * 100
+        return round(normalized_score, 2)
+    return 0
 
-def get_top_10(companies):
-    """Rank companies and return top 10"""
+
+def get_top_10(companies, weights=None):
+    """Rank companies and return top 10 with customizable weights"""
+    # Default weights if none provided
+    if weights is None:
+        weights = {
+            'revenue_weight': 1,
+            'growth_weight': 1,
+            'profitability_weight': 1,
+            'industry_weight': 1,
+            'size_weight': 1
+        }
+    
     for c in companies:
-        c['score'] = score_company(c)
+        c['score'] = score_company(c, weights)  # Pass weights to score_company
         c['industry'] = determine_industry(c.get('description', ''))
+        # Debug print
+        print(f"Company: {c['name']}")
+        print(f"Revenue: {c.get('revenue')}")
+        print(f"Growth: {c.get('growth_rate')}")
+        print(f"EBITDA: {c.get('ebitda')}")
+        print(f"Industry: {c['industry']}")
+        print(f"Score: {c['score']}\n")
+    
     return sorted(companies, key=lambda x: x['score'], reverse=True)[:10]
