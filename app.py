@@ -17,6 +17,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def index():
     return render_template("index.html", pdf_ready=False)
 
+# In app.py, modify the upload route
 @app.route("/upload", methods=["POST"])
 def upload():
     start_time = time.time()
@@ -36,20 +37,11 @@ def upload():
                 filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
                 file.save(filename)
                 
-                # Check for timeout
                 if time.time() - start_time > 5:
                     error = "Upload took too long"
                 else:
-                    # Process the PDF
-                    print("=== Extracting text from PDF ===")
                     text = extract_text_from_pdf(filename)
-                    
-                    print("=== Parsing companies ===")
                     companies = parse_companies(text)
-                    print(f"Found {len(companies)} companies")
-                    
-                    if companies:
-                        print("First company found:", companies[0]['name'])
                     
                     # Get weights from form
                     weights = {
@@ -57,20 +49,17 @@ def upload():
                         'growth_weight': float(request.form.get('growth_weight', 1)),
                         'profitability_weight': float(request.form.get('profitability_weight', 1)),
                         'industry_weight': float(request.form.get('industry_weight', 1)),
-                        'size_weight': float(request.form.get('size_weight', 1))
+                        'size_weight': float(request.form.get('size_weight', 1)),
+                        'selected_industries': request.form.getlist('industry')  # Get all checked industries
                     }
                     
-                    # Enrich company data and get top 10 using weights
                     enriched = [enrich_company_data(c) for c in companies]
-                    top_companies = get_top_10(enriched, weights)  # Modified to accept weights
+                    top_companies = get_top_10(enriched, weights)
                     
-                    # Check for timeout again
                     if time.time() - start_time > 10:
                         error = "Processing took too long"
                     else:
-                        # Generate PDF
                         if generate_pdf(top_companies, OUTPUT_PDF):
-                            print(f"Generated PDF in {time.time()-start_time:.2f}s")
                             return render_template("index.html", pdf_ready=True, error=None)
                         else:
                             error = "Failed to generate PDF"
@@ -81,7 +70,6 @@ def upload():
                 traceback.print_exc()
     
     return render_template("index.html", pdf_ready=False, error=error)
-
 
 @app.route("/download")
 def download():

@@ -4,14 +4,13 @@ from industry_classifier import determine_industry
 def estimate_revenue_from_industry(employees, industry):
     """Estimate revenue based on industry benchmarks per employee"""
     benchmarks = {
-        'fintech': 250000,    # $250K per employee
-        'software': 200000,
-        'data': 180000,
-        'security': 220000,
-        'infrastructure': 150000,
-        'hr_tech': 175000,
-        'hardware': 120000,
-        'real_estate': 100000,
+        'FinTech & Payments': 250000,          # $250K per employee
+        'Enterprise Software': 220000,          # $220K per employee
+        'Commerce Tech': 200000,                # $200K per employee
+        'Communications & Digital Infrastructure': 180000,
+        'HR Technology & Application Software': 175000,
+        'Internet & Enabling Technologies': 160000,
+        'Semiconductors & Related Technologies': 140000,
         'other': 150000
     }
     return int(employees * benchmarks.get(industry, 150000))
@@ -19,14 +18,13 @@ def estimate_revenue_from_industry(employees, industry):
 def estimate_ebitda_margin(industry):
     """Estimate typical EBITDA margin by industry"""
     margins = {
-        'fintech': 0.25,    # 25%
-        'software': 0.30,
-        'data': 0.20,
-        'security': 0.25,
-        'infrastructure': 0.15,
-        'hr_tech': 0.20,
-        'hardware': 0.10,
-        'real_estate': 0.15,
+        'FinTech & Payments': 0.30,             # 30%
+        'Enterprise Software': 0.35,            # 35%
+        'Commerce Tech': 0.25,                 # 25%
+        'Communications & Digital Infrastructure': 0.20,
+        'HR Technology & Application Software': 0.25,
+        'Internet & Enabling Technologies': 0.20,
+        'Semiconductors & Related Technologies': 0.15,
         'other': 0.10
     }
     return margins.get(industry, 0.10)
@@ -38,8 +36,10 @@ def enrich_company_data(company):
             return company
             
         # Determine industry
-        industry = determine_industry(company.get('description', ''))
-        company['industry'] = industry
+        #industry = determine_industry(company.get('description', ''))
+        #company['industry'] = industry
+        industry = company['industry'][0]
+        
         
         # Estimate employees if missing
         if not company.get('employees'):

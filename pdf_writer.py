@@ -74,7 +74,7 @@ class PDF(FPDF):
         # Score and industry as simple bullets
         self.set_font("Arial", '', 10)
         self.cell(0, 6, f"- Score: {company.get('score', 0)}", 0, 1)
-        self.cell(0, 6, f"- Industry: {company.get('industry', 'N/A')}", 0, 1)
+        self.cell(0, 6, f"- Industry: {company.get('industry', ['N/A'])[0]}", 0, 1)
         self.ln(2)
         
         # Financial metrics with simple bullets

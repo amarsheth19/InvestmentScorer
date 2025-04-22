@@ -1,76 +1,79 @@
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import quote_plus
-import re
-import random
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import time
+import random
 
-# Mock function to simulate LinkedIn scraping
-# Note: Actual LinkedIn scraping requires handling login and may violate terms of service
-# In a real implementation, you would need to use LinkedIn's API or a proper scraping tool
+def setup_driver():
+    options = Options()
+    options.add_argument("--headless")  # Run in background
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    driver = webdriver.Chrome(options=options)
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    return driver
+
+def scrape_linkedin(company_name):
+    driver = setup_driver()
+    try:
+        # Search for company
+        search_url = f"https://www.linkedin.com/search/results/companies/?keywords={company_name.replace(' ', '%20')}"
+        driver.get(search_url)
+        
+        # Wait for results and click first result
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".entity-result__title-text a"))
+        ).click()
+        
+        # Wait for company page to load
+        time.sleep(random.uniform(2, 4))
+        
+        # Try to get headcount
+        try:
+            about_section = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".org-page-details__definition-text"))
+            )
+            employees_text = about_section.text
+            if 'employees' in employees_text.lower():
+                return int(employees_text.split()[0].replace(',', ''))
+        except:
+            pass
+        
+        # Alternative method - look in the "About" section
+        try:
+            driver.find_element(By.CSS_SELECTOR, "[data-control-name='about_tab']").click()
+            time.sleep(1)
+            about_text = driver.find_element(By.CSS_SELECTOR, ".org-about-us-organization-description__text").text
+            match = re.search(r'(\d+,?\d*)\s+employees', about_text, re.IGNORECASE)
+            if match:
+                return int(match.group(1).replace(',', ''))
+        except:
+            pass
+        
+        return None
+    except Exception as e:
+        print(f"Error scraping LinkedIn for {company_name}: {str(e)}")
+        return None
+    finally:
+        driver.quit()
 
 def estimate_revenue_from_linkedin(company_name):
-    """
-    Estimate revenue based on LinkedIn headcount information.
-    Returns revenue in dollars or None if not found.
-    """
-    try:
-        # Simulate web scraping delay
-        time.sleep(random.uniform(1, 3))
-        
-        # Mock data - in a real implementation, you would scrape LinkedIn here
-        mock_data = {
-            "TechCorp": {"employees": 350, "industry": "Software"},
-            "AI Ventures": {"employees": 120, "industry": "Artificial Intelligence"},
-            "DataSystems": {"employees": 800, "industry": "Data Analytics"},
-            "CloudNine": {"employees": 250, "industry": "Cloud Computing"}
-        }
-        
-        # Try to find a matching company
-        for name, data in mock_data.items():
-            if name.lower() in company_name.lower():
-                employees = data['employees']
-                industry = data['industry']
-                
-                # Simple revenue estimation based on industry and headcount
-                if industry.lower() in ['software', 'artificial intelligence', 'cloud computing']:
-                    return employees * 250_000  # $250k per employee for tech
-                elif industry.lower() in ['data analytics', 'platform']:
-                    return employees * 200_000  # $200k per employee
-                else:
-                    return employees * 150_000  # $150k per employee default
-        
-        # If no exact match, return None
+    """Actual implementation using scraping"""
+    employees = scrape_linkedin(company_name)
+    if employees is None:
         return None
+        
+    # Industry-specific revenue per employee estimates
+    benchmarks = {
+        'software': 250000,
+        'fintech': 300000,
+        'manufacturing': 150000,
+        'retail': 100000,
+        'other': 200000
+    }
     
-    except Exception as e:
-        print(f"Error estimating revenue for {company_name}: {str(e)}")
-        return None
-
-def get_company_info(company_name):
-    """
-    Actual scraping function would go here (commented out as example)
-    """
-    # headers = {
-    #     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    # }
-    # 
-    # search_url = f"https://www.linkedin.com/search/results/companies/?keywords={quote_plus(company_name)}"
-    # 
-    # try:
-    #     response = requests.get(search_url, headers=headers)
-    #     soup = BeautifulSoup(response.text, 'html.parser')
-    #     
-    #     # Extract employee count - this selector would need to be updated based on LinkedIn's current structure
-    #     employee_count_element = soup.select_one('.entity-result__primary-subtitle')
-    #     if employee_count_element:
-    #         employee_text = employee_count_element.get_text(strip=True)
-    #         match = re.search(r'(\d+,?\d*) employees', employee_text)
-    #         if match:
-    #             return int(match.group(1).replace(',', ''))
-    #     
-    #     return None
-    # except Exception as e:
-    #     print(f"Error scraping LinkedIn: {str(e)}")
-    #     return None
-    return None
+    # Default to software if we don't know industry
+    return employees * benchmarks.get('software', 200000)
