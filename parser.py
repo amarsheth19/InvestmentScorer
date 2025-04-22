@@ -1,7 +1,7 @@
 import fitz  # PyMuPDF
 import re
 
-# Define the list of valid industry options
+
 VALID_INDUSTRIES = [
     "Commerce Tech", "FinTech & Payments", "Communications & Digital Infrastructure",
     "Enterprise Software", "HR Technology & Application Software", "Internet & Enabling Technologies", "Semiconductors & Related Technologies"
@@ -15,15 +15,15 @@ def extract_text_from_pdf(pdf_path):
     # Start from page 2
     for page in doc[1:]:
         text += page.get_text("text", flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE)
-        text += "\n===== PAGE END =====\n"  # Add page separator
+        text += "\n===== PAGE END =====\n" 
     return text
 
 def clean_company_name(name):
     """Clean and standardize company names"""
     if not name:
         return "Unknown Company"
-    name = re.sub(r'www\..+', '', name)  # Remove website
-    name = re.sub(r'\s+', ' ', name).strip()  # Normalize whitespace
+    name = re.sub(r'www\..+', '', name) 
+    name = re.sub(r'\s+', ' ', name).strip()  
     return name
 
 def parse_companies(text):
@@ -263,27 +263,3 @@ def extract_industry(text):
         found_industries.append("Semiconductors & Related Technologies")
 
     return found_industries
-
-# # Example usage:
-# pdf_path = "path/to/your/document.pdf"  # Replace with the actual path to your PDF file
-# pdf_text = extract_text_from_pdf(pdf_path)
-# companies = parse_companies(pdf_text)
-
-# # Now you can print the extracted company data
-# for company in companies:
-#     print(company)
-
-# # Example of getting the top 10 companies based on some weights:
-# weights = {
-#     'revenue_weight': 0.4,
-#     'growth_weight': 0.3,
-#     'profitability_weight': 0.2,
-#     'industry_weight': 0.1,
-#     'size_weight': 0.1
-# }
-
-# top_10_companies = get_top_10(companies, weights)
-
-# print("\nTop 10 Companies:")
-# for company in top_10_companies:
-#     print(company['name'], company['score'], company['industry'])

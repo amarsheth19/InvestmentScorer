@@ -17,7 +17,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def index():
     return render_template("index.html", pdf_ready=False)
 
-# In app.py, modify the upload route
 @app.route("/upload", methods=["POST"])
 def upload():
     start_time = time.time()
@@ -33,7 +32,6 @@ def upload():
             error = "Only PDF files allowed"
         else:
             try:
-                # Save the file
                 filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
                 file.save(filename)
                 
@@ -43,14 +41,14 @@ def upload():
                     text = extract_text_from_pdf(filename)
                     companies = parse_companies(text)
                     
-                    # Get weights from form
+                    # Get weights
                     weights = {
                         'revenue_weight': float(request.form.get('revenue_weight', 1)),
                         'growth_weight': float(request.form.get('growth_weight', 1)),
                         'profitability_weight': float(request.form.get('profitability_weight', 1)),
                         'industry_weight': float(request.form.get('industry_weight', 1)),
                         'size_weight': float(request.form.get('size_weight', 1)),
-                        'selected_industries': request.form.getlist('industry')  # Get all checked industries
+                        'selected_industries': request.form.getlist('industry') 
                     }
                     
                     enriched = [enrich_company_data(c) for c in companies]

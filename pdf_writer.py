@@ -6,10 +6,9 @@ def clean_text(text):
     if not text:
         return ""
     text = str(text)
-    # Replace problematic characters and preserve line breaks
-    text = text.replace('\u2022', '-')  # Replace bullet with hyphen
-    text = re.sub(r'[^\x20-\x7E\r\n]', '', text)  # Remove non-ASCII
-    text = re.sub(r' +', ' ', text)  # Collapse multiple spaces
+    text = text.replace('\u2022', '-')  
+    text = re.sub(r'[^\x20-\x7E\r\n]', '', text)  
+    text = re.sub(r' +', ' ', text)  
     return text.strip()
 
 def clean_company_name(raw_name):
@@ -29,8 +28,6 @@ def clean_company_name(raw_name):
     # Collapse multiple spaces and trim
     name = re.sub(r'\s+', ' ', name).strip()
     
-    # Capitalize properly (optional)
-    # name = name.title()
     
     return name if name else "Unknown Company"
 
@@ -62,22 +59,18 @@ class PDF(FPDF):
     
     def company_block(self, company):
         """Format a company entry in the PDF with proper name handling"""
-        # Get and clean the company name
         raw_name = company.get('name', '')
         clean_name = clean_company_name(raw_name)
         
-        # Company name as title
         self.set_font("Arial", 'B', 12)
         self.cell(0, 8, clean_name, 0, 1, 'L')
         self.ln(2)
         
-        # Score and industry as simple bullets
         self.set_font("Arial", '', 10)
         self.cell(0, 6, f"- Score: {company.get('score', 0)}", 0, 1)
         self.cell(0, 6, f"- Industry: {company.get('industry', ['N/A'])[0]}", 0, 1)
         self.ln(2)
         
-        # Financial metrics with simple bullets
         revenue_text = f"- Revenue: ${company.get('revenue', 0):,}"
         if company.get('revenue_estimated'):
             revenue_text += " (estimated)"
@@ -92,13 +85,11 @@ class PDF(FPDF):
         self.cell(0, 6, f"- Employees: {company.get('employees', 'N/A')}", 0, 1)
         self.ln(2)
         
-        # Description
         self.set_font("Arial", 'I', 10)
         self.cell(0, 6, "Description:", 0, 1)
         self.set_font("Arial", '', 10)
         self.safe_text(company.get('description', 'No description available'))
         
-        # Separator
         self.ln(8)
         self.cell(0, 0, '', 'T')
         self.ln(10)
