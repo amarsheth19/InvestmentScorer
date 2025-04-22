@@ -133,99 +133,197 @@ def parse_companies(text):
 
     return companies
 
-def score_company(company, weights):
-    """Score companies based on customizable weightings"""
-    score = 0
+# def score_company(company, weights):
+#     """Score companies based on customizable weightings"""
+#     score = 0
 
-    # Get weights with defaults if not provided
+#     # Get weights with defaults if not provided
+#     revenue_weight = weights.get('revenue_weight', 1)
+#     growth_weight = weights.get('growth_weight', 1)
+#     profitability_weight = weights.get('profitability_weight', 1)
+#     industry_weight = weights.get('industry_weight', 1)
+#     size_weight = weights.get('size_weight', 1)
+#     selected_industries = weights.get('selected_industries', [])  # Get selected industries
+
+#     # Revenue scoring (10-30M ideal) - max 40 points
+#     revenue = company.get('revenue')
+#     if revenue:
+#         if 10_000_000 <= revenue <= 30_000_000:
+#             score += 40 * revenue_weight
+#         elif 5_000_000 <= revenue < 10_000_000:
+#             score += 30 * revenue_weight
+#         elif 30_000_000 < revenue <= 50_000_000:
+#             score += 25 * revenue_weight
+#         elif revenue > 50_000_000:
+#             score += 10 * revenue_weight
+#         else:
+#             score += 5 * revenue_weight
+
+#     # Growth scoring (>10% ideal) - max 30 points
+#     growth = company.get('growth_rate')
+#     if growth:
+#         if growth >= 30:
+#             score += 30 * growth_weight
+#         elif growth >= 20:
+#             score += 25 * growth_weight
+#         elif growth >= 10:
+#             score += 20 * growth_weight
+#         elif growth >= 5:
+#             score += 10 * growth_weight
+#         else:
+#             score += 5 * growth_weight
+
+#     # Profitability scoring - max 20 points
+#     ebitda = company.get('ebitda')
+#     revenue = company.get('revenue', 1)
+#     if ebitda:
+#         if ebitda > revenue * 0.2:  # >20% margin
+#             score += 20 * profitability_weight
+#         elif ebitda > 0:
+#             score += 15 * profitability_weight
+#         else:
+#             score += 5 * profitability_weight
+
+#     # Industry fit scoring - max 10 points
+#     industry = company.get('industry')
+#     if industry and selected_industries:
+#         # Check if any of the company's industries are in the selected industries
+#         company_industries = industry if isinstance(industry, list) else [industry]
+#         matched_industries = [ind for ind in company_industries if ind in selected_industries]
+        
+#         if matched_industries:
+#             # Prioritize certain industries with higher scores
+#             if any("Enterprise Software" in ind for ind in matched_industries):
+#                 score += 10 * industry_weight
+#             elif any("FinTech" in ind for ind in matched_industries):
+#                 score += 8 * industry_weight
+#             elif any("Software" in ind for ind in matched_industries):
+#                 score += 6 * industry_weight
+#             else:
+#                 # Basic match with selected industries
+#                 score += 5 * industry_weight
+
+#     # Company size scoring - max 10 points
+#     employees = company.get('employees')
+#     if employees:
+#         if 50 <= employees <= 200:
+#             score += 10 * size_weight
+#         elif employees < 50:
+#             score += 5 * size_weight
+#         else:
+#             score += 2 * size_weight
+
+#     # Normalize the score to a 100-point scale based on weights
+#     max_possible = (
+#         40 * revenue_weight +
+#         30 * growth_weight +
+#         20 * profitability_weight +
+#         10 * industry_weight +
+#         10 * size_weight
+#     )
+
+#     if max_possible > 0:
+#         normalized_score = (score / max_possible) * 100
+#         write_investment_grade(company,normalized_score)
+#         return round(normalized_score, 2)
+#     return 0
+
+
+def score_company(company, weights):
+    """Score companies with controlled score ranges"""
+    raw_score = 0
+    
+    # Get weights (default to 1 if not provided)
     revenue_weight = weights.get('revenue_weight', 1)
     growth_weight = weights.get('growth_weight', 1)
     profitability_weight = weights.get('profitability_weight', 1)
     industry_weight = weights.get('industry_weight', 1)
     size_weight = weights.get('size_weight', 1)
-    selected_industries = weights.get('selected_industries', [])  # Get selected industries
+    selected_industries = weights.get('selected_industries', [])
 
-    # Revenue scoring (10-30M ideal) - max 40 points
-    revenue = company.get('revenue')
-    if revenue:
-        if 10_000_000 <= revenue <= 30_000_000:
-            score += 40 * revenue_weight
-        elif 5_000_000 <= revenue < 10_000_000:
-            score += 30 * revenue_weight
-        elif 30_000_000 < revenue <= 50_000_000:
-            score += 25 * revenue_weight
-        elif revenue > 50_000_000:
-            score += 10 * revenue_weight
-        else:
-            score += 5 * revenue_weight
+    # 1. Revenue Scoring (0-40 points * weight)
+    revenue = company.get('revenue', 0)
+    if revenue >= 30_000_000:
+        raw_score += 40 * revenue_weight
+    elif revenue >= 10_000_000:
+        raw_score += 30 * revenue_weight
+    elif revenue >= 5_000_000:
+        raw_score += 20 * revenue_weight
+    else:
+        raw_score += 10 * revenue_weight
 
-    # Growth scoring (>10% ideal) - max 30 points
-    growth = company.get('growth_rate')
-    if growth:
-        if growth >= 30:
-            score += 30 * growth_weight
-        elif growth >= 20:
-            score += 25 * growth_weight
-        elif growth >= 10:
-            score += 20 * growth_weight
-        elif growth >= 5:
-            score += 10 * growth_weight
-        else:
-            score += 5 * growth_weight
+    # 2. Growth Scoring (0-30 points * weight)
+    growth = company.get('growth_rate', 0)
+    if growth >= 30:
+        raw_score += 30 * growth_weight
+    elif growth >= 20:
+        raw_score += 25 * growth_weight
+    elif growth >= 10:
+        raw_score += 20 * growth_weight
+    elif growth >= 5:
+        raw_score += 10 * growth_weight
+    else:
+        raw_score += 5 * growth_weight
 
-    # Profitability scoring - max 20 points
-    ebitda = company.get('ebitda')
-    revenue = company.get('revenue', 1)
+    # 3. Profitability Scoring (0-20 points * weight)
+    ebitda = company.get('ebitda', 0)
+    revenue = company.get('revenue', 1)  # Avoid division by zero
     if ebitda:
-        if ebitda > revenue * 0.2:  # >20% margin
-            score += 20 * profitability_weight
-        elif ebitda > 0:
-            score += 15 * profitability_weight
+        margin = ebitda / revenue
+        if margin > 0.2:
+            raw_score += 20 * profitability_weight
+        elif margin > 0.1:
+            raw_score += 15 * profitability_weight
+        elif margin > 0:
+            raw_score += 10 * profitability_weight
         else:
-            score += 5 * profitability_weight
+            raw_score += 5 * profitability_weight
 
-    # Industry fit scoring - max 10 points
-    industry = company.get('industry')
+    # 4. Industry Scoring (0-25 points * weight)
+    industry = company.get('industry', [])
+    if isinstance(industry, str):
+        industry = [industry]
+    
     if industry and selected_industries:
-        # Check if any of the company's industries are in the selected industries
-        company_industries = industry if isinstance(industry, list) else [industry]
-        matched_industries = [ind for ind in company_industries if ind in selected_industries]
-        
+        matched_industries = [ind for ind in industry if ind in selected_industries]
         if matched_industries:
-            # Prioritize certain industries with higher scores
             if any("Enterprise Software" in ind for ind in matched_industries):
-                score += 10 * industry_weight
+                raw_score += 25 * industry_weight
             elif any("FinTech" in ind for ind in matched_industries):
-                score += 8 * industry_weight
+                raw_score += 20 * industry_weight
             elif any("Software" in ind for ind in matched_industries):
-                score += 6 * industry_weight
+                raw_score += 15 * industry_weight
             else:
-                # Basic match with selected industries
-                score += 5 * industry_weight
+                raw_score += 10 * industry_weight
 
-    # Company size scoring - max 10 points
-    employees = company.get('employees')
-    if employees:
-        if 50 <= employees <= 200:
-            score += 10 * size_weight
-        elif employees < 50:
-            score += 5 * size_weight
-        else:
-            score += 2 * size_weight
+    # 5. Size Scoring (0-15 points * weight)
+    employees = company.get('employees', 0)
+    if 50 <= employees <= 200:
+        raw_score += 15 * size_weight
+    elif employees > 200:
+        raw_score += 5 * size_weight
+    else:
+        raw_score += 10 * size_weight  # Small companies get moderate points
 
-    # Normalize the score to a 100-point scale based on weights
+    # Calculate display score (0-100 scale)
     max_possible = (
-        40 * revenue_weight +
-        30 * growth_weight +
-        20 * profitability_weight +
-        10 * industry_weight +
-        10 * size_weight
+        40 * revenue_weight + 
+        30 * growth_weight + 
+        20 * profitability_weight + 
+        25 * industry_weight + 
+        15 * size_weight
     )
-
+    
     if max_possible > 0:
-        normalized_score = (score / max_possible) * 100
-        return round(normalized_score, 2)
-    return 0
+        display_score = (raw_score / max_possible) * 100
+    else:
+        display_score = 0
+
+    write_investment_grade(company,display_score)
+    return {
+        'raw_score': raw_score,  # For ranking
+        'display_score': min(100, round(display_score, 2))  # Capped at 100
+    }
 
 def get_top_10(companies, weights=None):
     """Rank companies and return top 10 with customizable weights"""
@@ -240,7 +338,7 @@ def get_top_10(companies, weights=None):
         }
 
     for c in companies:
-        c['score'] = score_company(c, weights)  # Pass weights to score_company
+        c['score'] = score_company(c, weights)['display_score'] # Pass weights to score_company
         # Debug print
         print(f"Company: {c['name']}")
         print(f"Revenue: {c.get('revenue')}")
@@ -248,6 +346,7 @@ def get_top_10(companies, weights=None):
         print(f"EBITDA: {c.get('ebitda')}")
         print(f"Industry: {c.get('industry')}")
         print(f"Score: {c['score']}\n")
+        print(f"Investment Grade: {c['investment grade']}\n")
 
     return sorted(companies, key=lambda x: x['score'], reverse=True)[:10]
 
@@ -263,3 +362,24 @@ def extract_industry(text):
         found_industries.append("Semiconductors & Related Technologies")
 
     return found_industries
+
+
+def write_investment_grade(company, score):
+    if score >= 93:
+        company["investment grade"] = "A"
+    elif score >= 90:
+        company["investment grade"] = "A-"
+    elif score >= 87:
+        company["investment grade"] = "B+"
+    elif score >= 83:
+        company["investment grade"] = "B"
+    elif score >= 80:
+        company["investment grade"] = "B-"
+    elif score >= 77:
+        company["investment grade"] = "C+"
+    elif score >= 73:
+        company["investment grade"] = "C"
+    elif score >= 70:
+        company["investment grade"] = "C-"
+    else:
+        company["investment grade"] = "D"

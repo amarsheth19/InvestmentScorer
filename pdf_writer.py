@@ -83,6 +83,7 @@ class PDF(FPDF):
         
         self.cell(0, 6, f"- Growth Rate: {company.get('growth_rate', 'N/A')}%", 0, 1)
         self.cell(0, 6, f"- Employees: {company.get('employees', 'N/A')}", 0, 1)
+        self.cell(0, 6, f"- Investment Grade: {company.get('investment grade', 'N/A')}", 0, 1)
         self.ln(2)
         
         self.set_font("Arial", 'I', 10)
