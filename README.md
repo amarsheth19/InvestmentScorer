@@ -9,7 +9,7 @@ A Python tool that automates the process of ranking investment opportunities by 
 
 ## Technologies
 - Python
-- PDF parsing libraries (e.g., PyMuPDF, pdfminer)
+- PDF parsing libraries (PyMuPDF, pdfminer)
 - Pandas
 
 ## Notes
